@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Calculadora Avanzada de Gradiente Descendente</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        table { margin-top: 20px; border-collapse: collapse; }
+        th, td { padding: 8px 12px; border: 1px solid #ccc; text-align: center; }
+        th { background-color: #f4f4f4; }
+        form { margin-bottom: 20px; }
+        label { display: inline-block; width: 250px; margin-bottom: 10px; }
+        input, select { padding: 5px; width: 200px; }
+        input[type="submit"] { width: auto; }
+    </style>
+</head>
+<body>
+    <h1>Calculadora Avanzada de Gradiente Descendente</h1>
+    
+    <form id="formulario">
+        <label for="num_iteraciones">Número de Iteraciones:</label>
+        <input type="number" id="num_iteraciones" name="num_iteraciones" required><br><br>
+        
+        <label for="tasa_aprendizaje">Tasa de Aprendizaje:</label>
+        <input type="number" id="tasa_aprendizaje" name="tasa_aprendizaje" step="0.01" min="0" max="1" value="0.1" required><br><br>
+        
+        <label for="funcion_costo">Función de Costo:</label>
+        <select id="funcion_costo" name="funcion_costo" required>
+            <option value="">Seleccione una función de costo</option>
+            <option value="cuadratica">Cuadrática</option>
+            <option value="absoluta">Absoluta</option>
+        </select><br><br>
+        
+        <label for="tipo_gradiente">Tipo de Gradiente:</label>
+        <select id="tipo_gradiente" name="tipo_gradiente" required>
+            <option value="">Seleccione un tipo de gradiente</option>
+            <option value="batch">Batch</option>
+            <option value="estocastico">Estocástico</option>
+        </select><br><br>
+        
+        <label for="tamano_lote">Tamaño del Lote (para Estocástico):</label>
+        <input type="number" id="tamano_lote" name="tamano_lote" min="1" max="100" value="10" required><br><br>
+        
+        <input type="submit" value="Calcular">
+    </form>
+
+    <div id="resultados"></div>
+    <div>
+        <canvas id="myChart" width="400" height="200"></canvas>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.getElementById('formulario').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Obtener valores del formulario
+            const num_iteraciones = parseInt(document.getElementById('num_iteraciones').value);
+            const tasa_aprendizaje = parseFloat(document.getElementById('tasa_aprendizaje').value);
+            const funcion_costo = document.getElementById('funcion_costo').value;
+            const tipo_gradiente = document.getElementById('tipo_gradiente').value;
+            const tamano_lote = parseInt(document.getElementById('tamano_lote').value);
+
+            // Función para calcular el gradiente
+            function calcular_gradiente(w, x, y, funcion_costo) {
+                if (funcion_costo === 'cuadratica') {
+                    return 2 * (w * x - y) * x;
+                } else if (funcion_costo === 'absoluta') {
+                    return (w * x > y) ? x : ((w * x < y) ? -x : 0);
+                }
+            }
+
+            // Función para calcular el costo
+            function calcular_funcion_costo(w, x, y, funcion_costo) {
+                if (funcion_costo === 'cuadratica') {
+                    return Math.pow(w * x - y, 2);
+                } else if (funcion_costo === 'absoluta') {
+                    return Math.abs(w * x - y);
+                }
+            }
+
+            // Variables iniciales
+            let w = 0; // Peso inicial
+            const x = [];
+            const y = [];
+            
+            // Generar datos aleatorios
+            for (let i = 0; i < 100; i++) {
+                x.push(Math.random() * 10);
+                y.push(Math.random() * 20);
+            }
+
+            let resultados = "<h2>Resultados:</h2><table border='1'><tr><th>Iteración</th><th>Peso (w)</th><th>Función Costo</th></tr>";
+            const costos = [];
+            
+            // Proceso de iteraciones
+            for (let i = 0; i < num_iteraciones; i++) {
+                let gradiente_total = 0;
+                let costo_total = 0;
+
+                if (tipo_gradiente === 'batch') {
+                    for (let j = 0; j < x.length; j++) {
+                        const gradiente = calcular_gradiente(w, x[j], y[j], funcion_costo);
+                        const costo = calcular_funcion_costo(w, x[j], y[j], funcion_costo);
+                        gradiente_total += gradiente;
+                        costo_total += costo;
+                    }
+                    w -= tasa_aprendizaje * (gradiente_total / x.length);
+                    costo_total /= x.length;
+                } else if (tipo_gradiente === 'estocastico') {
+                    const indices_lote = Array.from({length: tamano_lote}, () => Math.floor(Math.random() * x.length));
+                    for (const index of indices_lote) {
+                        const gradiente = calcular_gradiente(w, x[index], y[index], funcion_costo);
+                        const costo = calcular_funcion_costo(w, x[index], y[index], funcion_costo);
+                        gradiente_total += gradiente;
+                        costo_total += costo;
+                    }
+                    w -= tasa_aprendizaje * (gradiente_total / tamano_lote);
+                    costo_total /= tamano_lote;
+                }
+
+                costos.push(costo_total);
+                resultados += `<tr><td>${i + 1}</td><td>${w.toFixed(4)}</td><td>${costo_total.toFixed(4)}</td></tr>`;
+            }
+
+            resultados += "</table>";
+            document.getElementById('resultados').innerHTML = resultados;
+
+            // Crear el gráfico
+            const ctx = document.getElementById('myChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: num_iteraciones}, (_, i) => i + 1),
+                    datasets: [{
+                        label: 'Función de Costo',
+                        data: costos,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
